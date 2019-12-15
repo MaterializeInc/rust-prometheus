@@ -51,6 +51,8 @@ impl Encoder for TextEncoder {
                     }
                     MetricType::HISTOGRAM => {
                         let h = m.get_histogram();
+                        let include_raw = h.include_unaggregated;
+                        let mut last_count = 0.0;
 
                         let mut inf_seen = false;
                         for b in h.get_bucket() {
@@ -63,6 +65,18 @@ impl Encoder for TextEncoder {
                                 b.get_cumulative_count() as f64,
                                 writer,
                             )?;
+                            if include_raw {
+                                let cumul_count = b.get_cumulative_count() as f64;
+                                write_sample(
+                                    &format!("{}", name),
+                                    m,
+                                    BUCKET_LABEL,
+                                    &format!("{}", upper_bound),
+                                    cumul_count - last_count,
+                                    writer,
+                                )?;
+                                last_count = cumul_count;
+                            }
                             if upper_bound.is_sign_positive() && upper_bound.is_infinite() {
                                 inf_seen = true;
                             }
@@ -76,6 +90,16 @@ impl Encoder for TextEncoder {
                                 h.get_sample_count() as f64,
                                 writer,
                             )?;
+                            if include_raw {
+                                write_sample(
+                                    &format!("{}", name),
+                                    m,
+                                    BUCKET_LABEL,
+                                    POSITIVE_INF,
+                                    h.get_sample_count() as f64 - last_count,
+                                    writer,
+                                )?;
+                            }
                         }
 
                         write_sample(

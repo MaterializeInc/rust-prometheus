@@ -128,6 +128,15 @@ macro_rules! histogram_opts {
         let hopts = histogram_opts!($NAME, $HELP, $BUCKETS);
         hopts.const_labels($CONST_LABELS)
     }};
+
+    ($NAME:expr, $HELP:expr, $BUCKETS:expr, include_unaggregated => $IA:expr) => {{
+        let hopts = histogram_opts!($NAME, $HELP, $BUCKETS);
+        if $IA {
+            hopts.include_unaggregated()
+        } else {
+            hopts
+        }
+    }};
 }
 
 /// Create a [`Counter`] and registers to default registry.
@@ -352,6 +361,12 @@ macro_rules! register_histogram {
         register_histogram!(histogram_opts!($NAME, $HELP, $BUCKETS))
     };
 
+    ($NAME:expr, $HELP:expr, $BUCKETS:expr, include_unaggregated => $IA:expr) => {{
+        register_histogram!(
+            histogram_opts!($NAME, $HELP, $BUCKETS, include_unaggregated => $IA),
+        )
+    }};
+
     ($HOPTS:expr) => {{
         let histogram = $crate::Histogram::with_opts($HOPTS).unwrap();
         $crate::register(Box::new(histogram.clone())).map(|_| histogram)
@@ -393,5 +408,12 @@ macro_rules! register_histogram_vec {
 
     ($NAME:expr, $HELP:expr, $LABELS_NAMES:expr, $BUCKETS:expr) => {{
         register_histogram_vec!(histogram_opts!($NAME, $HELP, $BUCKETS), $LABELS_NAMES)
+    }};
+
+    ($NAME:expr, $HELP:expr, $LABELS_NAMES:expr, $BUCKETS:expr, include_unaggregated => $IA:expr) => {{
+        register_histogram_vec!(
+            histogram_opts!($NAME, $HELP, $BUCKETS, include_unaggregated => $IA),
+            $LABELS_NAMES
+        )
     }};
 }

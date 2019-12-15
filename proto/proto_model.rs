@@ -1182,6 +1182,7 @@ pub struct Histogram {
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
     pub cached_size: ::protobuf::CachedSize,
+    pub include_unaggregated: bool,
 }
 
 impl Histogram {
