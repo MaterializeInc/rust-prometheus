@@ -227,7 +227,7 @@ impl HistogramCore {
         let mut h = proto::Histogram::default();
         h.set_sample_sum(self.sum.get());
         h.set_sample_count(self.count.get() as u64);
-        h.include_unaggregated = self.include_unaggregated;
+        h.set_include_unaggregated(self.include_unaggregated);
 
         let mut count = 0;
         let mut buckets = Vec::with_capacity(self.upper_bounds.len());

@@ -51,7 +51,7 @@ impl Encoder for TextEncoder {
                     }
                     MetricType::HISTOGRAM => {
                         let h = m.get_histogram();
-                        let include_raw = h.include_unaggregated;
+                        let include_raw = h.get_include_unaggregated();
                         let mut last_count = 0.0;
 
                         let mut inf_seen = false;

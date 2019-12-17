@@ -28,6 +28,6 @@ examples:
 gen_proto:
 	@ which protoc >/dev/null || { echo "Please install protoc first"; exit 1; }
 	@ which protoc-gen-rust >/dev/null || { echo "Please install protobuf rust plugin, cargo install protobuf"; exit 1; }
-	protoc --rust_out proto proto/metrics.proto
+	protoc --rust_out proto proto/*.proto
 
 .PHONY: all examples
