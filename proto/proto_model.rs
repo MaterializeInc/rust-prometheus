@@ -1179,7 +1179,7 @@ pub struct Histogram {
     sample_count: ::std::option::Option<u64>,
     sample_sum: ::std::option::Option<f64>,
     bucket: ::protobuf::RepeatedField<Bucket>,
-    include_unaggregated: ::std::option::Option<bool>,
+    expose_decumulated: ::std::option::Option<bool>,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
     pub cached_size: ::protobuf::CachedSize,
@@ -1253,23 +1253,23 @@ impl Histogram {
         &self.bucket
     }
 
-    // optional bool include_unaggregated = 4;
+    // optional bool expose_decumulated = 4;
 
-    pub fn clear_include_unaggregated(&mut self) {
-        self.include_unaggregated = ::std::option::Option::None;
+    pub fn clear_expose_decumulated(&mut self) {
+        self.expose_decumulated = ::std::option::Option::None;
     }
 
-    pub fn has_include_unaggregated(&self) -> bool {
-        self.include_unaggregated.is_some()
+    pub fn has_expose_decumulated(&self) -> bool {
+        self.expose_decumulated.is_some()
     }
 
     // Param is passed by value, moved
-    pub fn set_include_unaggregated(&mut self, v: bool) {
-        self.include_unaggregated = ::std::option::Option::Some(v);
+    pub fn set_expose_decumulated(&mut self, v: bool) {
+        self.expose_decumulated = ::std::option::Option::Some(v);
     }
 
-    pub fn get_include_unaggregated(&self) -> bool {
-        self.include_unaggregated.unwrap_or(false)
+    pub fn get_expose_decumulated(&self) -> bool {
+        self.expose_decumulated.unwrap_or(false)
     }
 }
 
@@ -1309,7 +1309,7 @@ impl ::protobuf::Message for Histogram {
                         return ::std::result::Result::Err(::protobuf::rt::unexpected_wire_type(wire_type));
                     }
                     let tmp = is.read_bool()?;
-                    self.include_unaggregated = ::std::option::Option::Some(tmp);
+                    self.expose_decumulated = ::std::option::Option::Some(tmp);
                 },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
@@ -1333,7 +1333,7 @@ impl ::protobuf::Message for Histogram {
             let len = value.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
         };
-        if let Some(v) = self.include_unaggregated {
+        if let Some(v) = self.expose_decumulated {
             my_size += 2;
         }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
@@ -1353,7 +1353,7 @@ impl ::protobuf::Message for Histogram {
             os.write_raw_varint32(v.get_cached_size())?;
             v.write_to_with_cached_sizes(os)?;
         };
-        if let Some(v) = self.include_unaggregated {
+        if let Some(v) = self.expose_decumulated {
             os.write_bool(4, v)?;
         }
         os.write_unknown_fields(self.get_unknown_fields())?;
@@ -1414,9 +1414,9 @@ impl ::protobuf::Message for Histogram {
                     |m: &mut Histogram| { &mut m.bucket },
                 ));
                 fields.push(::protobuf::reflect::accessor::make_option_accessor::<_, ::protobuf::types::ProtobufTypeBool>(
-                    "include_unaggregated",
-                    |m: &Histogram| { &m.include_unaggregated },
-                    |m: &mut Histogram| { &mut m.include_unaggregated },
+                    "expose_decumulated",
+                    |m: &Histogram| { &m.expose_decumulated },
+                    |m: &mut Histogram| { &mut m.expose_decumulated },
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<Histogram>(
                     "Histogram",
@@ -1443,7 +1443,7 @@ impl ::protobuf::Clear for Histogram {
         self.clear_sample_count();
         self.clear_sample_sum();
         self.clear_bucket();
-        self.clear_include_unaggregated();
+        self.clear_expose_decumulated();
         self.unknown_fields.clear();
     }
 }
@@ -2534,7 +2534,7 @@ static file_descriptor_proto_data: &'static [u8] = b"\
     \x01R\x05value\"\xb6\x01\n\tHistogram\x12!\n\x0csample_count\x18\x01\x20\
     \x01(\x04R\x0bsampleCount\x12\x1d\n\nsample_sum\x18\x02\x20\x01(\x01R\ts\
     ampleSum\x124\n\x06bucket\x18\x03\x20\x03(\x0b2\x1c.io.prometheus.client\
-    .BucketR\x06bucket\x121\n\x14include_unaggregated\x18\x04\x20\x01(\x08R\
+    .BucketR\x06bucket\x121\n\x14expose_decumulated\x18\x04\x20\x01(\x08R\
     \x13includeUnaggregated\"T\n\x06Bucket\x12)\n\x10cumulative_count\x18\
     \x01\x20\x01(\x04R\x0fcumulativeCount\x12\x1f\n\x0bupper_bound\x18\x02\
     \x20\x01(\x01R\nupperBound\"\xff\x02\n\x06Metric\x125\n\x05label\x18\x01\

@@ -129,10 +129,10 @@ macro_rules! histogram_opts {
         hopts.const_labels($CONST_LABELS)
     }};
 
-    ($NAME:expr, $HELP:expr, $BUCKETS:expr, include_unaggregated => $IA:expr) => {{
+    ($NAME:expr, $HELP:expr, $BUCKETS:expr, expose_decumulated => $IA:expr) => {{
         let hopts = histogram_opts!($NAME, $HELP, $BUCKETS);
         if $IA {
-            hopts.include_unaggregated()
+            hopts.expose_decumulated()
         } else {
             hopts
         }
@@ -361,9 +361,9 @@ macro_rules! register_histogram {
         register_histogram!(histogram_opts!($NAME, $HELP, $BUCKETS))
     };
 
-    ($NAME:expr, $HELP:expr, $BUCKETS:expr, include_unaggregated => $IA:expr) => {{
+    ($NAME:expr, $HELP:expr, $BUCKETS:expr, expose_decumulated => $IA:expr) => {{
         register_histogram!(
-            histogram_opts!($NAME, $HELP, $BUCKETS, include_unaggregated => $IA),
+            histogram_opts!($NAME, $HELP, $BUCKETS, expose_decumulated => $IA),
         )
     }};
 
@@ -410,9 +410,9 @@ macro_rules! register_histogram_vec {
         register_histogram_vec!(histogram_opts!($NAME, $HELP, $BUCKETS), $LABELS_NAMES)
     }};
 
-    ($NAME:expr, $HELP:expr, $LABELS_NAMES:expr, $BUCKETS:expr, include_unaggregated => $IA:expr) => {{
+    ($NAME:expr, $HELP:expr, $LABELS_NAMES:expr, $BUCKETS:expr, expose_decumulated => $IA:expr) => {{
         register_histogram_vec!(
-            histogram_opts!($NAME, $HELP, $BUCKETS, include_unaggregated => $IA),
+            histogram_opts!($NAME, $HELP, $BUCKETS, expose_decumulated => $IA),
             $LABELS_NAMES
         )
     }};

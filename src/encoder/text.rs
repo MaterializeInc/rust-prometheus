@@ -54,7 +54,7 @@ impl Encoder for TextEncoder {
                     }
                     MetricType::HISTOGRAM => {
                         let h = m.get_histogram();
-                        if h.get_include_unaggregated() {
+                        if h.get_expose_decumulated() {
                             // batch these so that they are emitted as a different metric
                             decumulate_hists
                                 .entry(name)
