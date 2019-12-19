@@ -1,5 +1,6 @@
 // Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.
 
+use std::collections::HashMap;
 use std::io::Write;
 
 use crate::errors::Result;
@@ -27,6 +28,8 @@ impl TextEncoder {
 
 impl Encoder for TextEncoder {
     fn encode<W: Write>(&self, metric_families: &[MetricFamily], writer: &mut W) -> Result<()> {
+        let mut decumulate_hists = HashMap::new();
+
         for mf in metric_families {
             // Fail-fast checks.
             check_metric_family(mf)?;
@@ -51,57 +54,14 @@ impl Encoder for TextEncoder {
                     }
                     MetricType::HISTOGRAM => {
                         let h = m.get_histogram();
-                        let include_raw = h.get_include_unaggregated();
-                        let mut last_count = 0.0;
-
-                        let mut inf_seen = false;
-                        for b in h.get_bucket() {
-                            let upper_bound = b.get_upper_bound();
-                            write_sample(
-                                &format!("{}_bucket", name),
-                                m,
-                                BUCKET_LABEL,
-                                &format!("{}", upper_bound),
-                                b.get_cumulative_count() as f64,
-                                writer,
-                            )?;
-                            if include_raw {
-                                let cumul_count = b.get_cumulative_count() as f64;
-                                write_sample(
-                                    &format!("{}", name),
-                                    m,
-                                    BUCKET_LABEL,
-                                    &format!("{}", upper_bound),
-                                    cumul_count - last_count,
-                                    writer,
-                                )?;
-                                last_count = cumul_count;
-                            }
-                            if upper_bound.is_sign_positive() && upper_bound.is_infinite() {
-                                inf_seen = true;
-                            }
+                        if h.get_include_unaggregated() {
+                            // batch these so that they are emitted as a different metric
+                            decumulate_hists
+                                .entry(name)
+                                .or_insert_with(Vec::new)
+                                .push((mf, m));
                         }
-                        if !inf_seen {
-                            write_sample(
-                                &format!("{}_bucket", name),
-                                m,
-                                BUCKET_LABEL,
-                                POSITIVE_INF,
-                                h.get_sample_count() as f64,
-                                writer,
-                            )?;
-                            if include_raw {
-                                write_sample(
-                                    &format!("{}", name),
-                                    m,
-                                    BUCKET_LABEL,
-                                    POSITIVE_INF,
-                                    h.get_sample_count() as f64 - last_count,
-                                    writer,
-                                )?;
-                            }
-                        }
-
+                        write_histogram(&format!("{}_bucket", name), h, m, writer, false)?;
                         write_sample(
                             &format!("{}_sum", name),
                             m,
@@ -127,12 +87,74 @@ impl Encoder for TextEncoder {
             }
         }
 
+        // Write out histogram buckets without the sums
+        for (_name, metrics) in decumulate_hists {
+            let mut type_printed = false;
+
+            for (mf, m) in metrics {
+                let name = format!("{}_hist", mf.get_name());
+                if !type_printed {
+                    let help = mf.get_help();
+                    if !help.is_empty() {
+                        writeln!(writer, "# HELP {} {}", name, escape_string(help, false))?;
+                    }
+                    writeln!(writer, "# TYPE {} counter", name)?;
+                    type_printed = true;
+                }
+
+                let h = m.get_histogram();
+                write_histogram(&name, h, m, writer, true)?;
+            }
+        }
+
         Ok(())
     }
 
     fn format_type(&self) -> &str {
         TEXT_FORMAT
     }
+}
+
+fn write_histogram(
+    name: &str,
+    h: &proto::Histogram,
+    m: &proto::Metric,
+    writer: &mut dyn Write,
+    decumulate: bool,
+) -> Result<()> {
+    let mut last_count = 0.0;
+
+    let mut inf_seen = false;
+    for b in h.get_bucket() {
+        let upper_bound = b.get_upper_bound();
+        let cumul_count = b.get_cumulative_count() as f64;
+        write_sample(
+            &name,
+            m,
+            BUCKET_LABEL,
+            &format!("{}", upper_bound),
+            cumul_count - last_count,
+            writer,
+        )?;
+        if upper_bound.is_sign_positive() && upper_bound.is_infinite() {
+            inf_seen = true;
+        }
+        if decumulate {
+            last_count = cumul_count;
+        }
+    }
+    if !inf_seen {
+        write_sample(
+            &name,
+            m,
+            BUCKET_LABEL,
+            POSITIVE_INF,
+            h.get_sample_count() as f64 - last_count,
+            writer,
+        )?;
+    }
+
+    Ok(())
 }
 
 /// `write_sample` writes a single sample in text format to `writer`, given the
