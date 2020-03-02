@@ -36,7 +36,7 @@ macro_rules! labels {
     };
 }
 
-/// Create an [`Opts`](::Opts).
+/// Create an [`Opts`].
 ///
 /// # Examples
 ///
@@ -82,7 +82,7 @@ macro_rules! opts {
     }
 }
 
-/// Create a [`HistogramOpts`](::HistogramOpts).
+/// Create a [`HistogramOpts`].
 ///
 /// # Examples
 ///
@@ -128,9 +128,18 @@ macro_rules! histogram_opts {
         let hopts = histogram_opts!($NAME, $HELP, $BUCKETS);
         hopts.const_labels($CONST_LABELS)
     }};
+
+    ($NAME:expr, $HELP:expr, $BUCKETS:expr, expose_decumulated => $IA:expr) => {{
+        let hopts = histogram_opts!($NAME, $HELP, $BUCKETS);
+        if $IA {
+            hopts.expose_decumulated()
+        } else {
+            hopts
+        }
+    }};
 }
 
-/// Create a [`Counter`](::Counter) and registers to default registry.
+/// Create a [`Counter`] and registers to default registry.
 ///
 /// # Examples
 ///
@@ -161,7 +170,7 @@ macro_rules! register_counter {
     }};
 }
 
-/// Create an [`IntCounter`](::IntCounter) and registers to default registry.
+/// Create an [`IntCounter`] and registers to default registry.
 ///
 /// View docs of `register_counter` for examples.
 #[macro_export(local_inner_macros)]
@@ -184,7 +193,7 @@ macro_rules! __register_counter_vec {
     }};
 }
 
-/// Create a [`CounterVec`](::CounterVec) and registers to default registry.
+/// Create a [`CounterVec`] and registers to default registry.
 ///
 /// # Examples
 ///
@@ -210,7 +219,7 @@ macro_rules! register_counter_vec {
     }};
 }
 
-/// Create an [`IntCounterVec`](::IntCounterVec) and registers to default registry.
+/// Create an [`IntCounterVec`] and registers to default registry.
 ///
 /// View docs of `register_counter_vec` for examples.
 #[macro_export(local_inner_macros)]
@@ -233,7 +242,7 @@ macro_rules! __register_gauge {
     }};
 }
 
-/// Create a [`Gauge`](::Gauge) and registers to default registry.
+/// Create a [`Gauge`] and registers to default registry.
 ///
 /// # Examples
 ///
@@ -259,7 +268,7 @@ macro_rules! register_gauge {
     }};
 }
 
-/// Create an [`IntGauge`](::IntGauge) and registers to default registry.
+/// Create an [`IntGauge`] and registers to default registry.
 ///
 /// View docs of `register_gauge` for examples.
 #[macro_export(local_inner_macros)]
@@ -282,7 +291,7 @@ macro_rules! __register_gauge_vec {
     }};
 }
 
-/// Create a [`GaugeVec`](::GaugeVec) and registers to default registry.
+/// Create a [`GaugeVec`] and registers to default registry.
 ///
 /// # Examples
 ///
@@ -308,7 +317,7 @@ macro_rules! register_gauge_vec {
     }};
 }
 
-/// Create an [`IntGaugeVec`](::IntGaugeVec) and registers to default registry.
+/// Create an [`IntGaugeVec`] and registers to default registry.
 ///
 /// View docs of `register_gauge_vec` for examples.
 #[macro_export(local_inner_macros)]
@@ -322,7 +331,7 @@ macro_rules! register_int_gauge_vec {
     }};
 }
 
-/// Create a [`Histogram`](::Histogram) and registers to default registry.
+/// Create a [`Histogram`] and registers to default registry.
 ///
 /// # Examples
 ///
@@ -352,13 +361,19 @@ macro_rules! register_histogram {
         register_histogram!(histogram_opts!($NAME, $HELP, $BUCKETS))
     };
 
+    ($NAME:expr, $HELP:expr, $BUCKETS:expr, expose_decumulated => $IA:expr) => {{
+        register_histogram!(
+            histogram_opts!($NAME, $HELP, $BUCKETS, expose_decumulated => $IA),
+        )
+    }};
+
     ($HOPTS:expr) => {{
         let histogram = $crate::Histogram::with_opts($HOPTS).unwrap();
         $crate::register(Box::new(histogram.clone())).map(|_| histogram)
     }};
 }
 
-/// Create a [`HistogramVec`](::HistogramVec) and registers to default registry.
+/// Create a [`HistogramVec`] and registers to default registry.
 ///
 /// # Examples
 ///
@@ -393,5 +408,12 @@ macro_rules! register_histogram_vec {
 
     ($NAME:expr, $HELP:expr, $LABELS_NAMES:expr, $BUCKETS:expr) => {{
         register_histogram_vec!(histogram_opts!($NAME, $HELP, $BUCKETS), $LABELS_NAMES)
+    }};
+
+    ($NAME:expr, $HELP:expr, $LABELS_NAMES:expr, $BUCKETS:expr, expose_decumulated => $IA:expr) => {{
+        register_histogram_vec!(
+            histogram_opts!($NAME, $HELP, $BUCKETS, expose_decumulated => $IA),
+            $LABELS_NAMES
+        )
     }};
 }
