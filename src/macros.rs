@@ -184,6 +184,20 @@ macro_rules! register_int_counter {
     }};
 }
 
+/// Create a [`UIntCounter`] and registers to default registry.
+///
+/// View docs of `register_counter` for examples.
+#[macro_export(local_inner_macros)]
+macro_rules! register_uint_counter {
+    ($OPTS:expr) => {{
+        register_counter!(@of_type UIntCounter, $OPTS)
+    }};
+
+    ($NAME:expr, $HELP:expr) => {{
+        register_uint_counter!(opts!($NAME, $HELP))
+    }};
+}
+
 #[macro_export]
 #[doc(hidden)]
 macro_rules! __register_counter_vec {
@@ -230,6 +244,20 @@ macro_rules! register_int_counter_vec {
 
     ($NAME:expr, $HELP:expr, $LABELS_NAMES:expr) => {{
         register_int_counter_vec!(opts!($NAME, $HELP), $LABELS_NAMES)
+    }};
+}
+
+/// Create an [`IntCounterVec`] and registers to default registry.
+///
+/// View docs of `register_counter_vec` for examples.
+#[macro_export(local_inner_macros)]
+macro_rules! register_uint_counter_vec {
+    ($OPTS:expr, $LABELS_NAMES:expr) => {{
+        __register_counter_vec!(UIntCounterVec, $OPTS, $LABELS_NAMES)
+    }};
+
+    ($NAME:expr, $HELP:expr, $LABELS_NAMES:expr) => {{
+        register_uint_counter_vec!(opts!($NAME, $HELP), $LABELS_NAMES)
     }};
 }
 
@@ -282,6 +310,20 @@ macro_rules! register_int_gauge {
     }};
 }
 
+/// Create a [`UIntGauge`] and registers to default registry.
+///
+/// View docs of `register_gauge` for examples.
+#[macro_export(local_inner_macros)]
+macro_rules! register_uint_gauge {
+    ($OPTS:expr) => {{
+        __register_gauge!(UIntGauge, $OPTS)
+    }};
+
+    ($NAME:expr, $HELP:expr) => {{
+        register_uint_gauge!(opts!($NAME, $HELP))
+    }};
+}
+
 #[macro_export]
 #[doc(hidden)]
 macro_rules! __register_gauge_vec {
@@ -328,6 +370,20 @@ macro_rules! register_int_gauge_vec {
 
     ($NAME:expr, $HELP:expr, $LABELS_NAMES:expr) => {{
         register_int_gauge_vec!(opts!($NAME, $HELP), $LABELS_NAMES)
+    }};
+}
+
+/// Create an [`UIntGaugeVec`] and registers to default registry.
+///
+/// View docs of `register_gauge_vec` for examples.
+#[macro_export(local_inner_macros)]
+macro_rules! register_uint_gauge_vec {
+    ($OPTS:expr, $LABELS_NAMES:expr) => {{
+        __register_gauge_vec!(UIntGaugeVec, $OPTS, $LABELS_NAMES)
+    }};
+
+    ($NAME:expr, $HELP:expr, $LABELS_NAMES:expr) => {{
+        register_uint_gauge_vec!(opts!($NAME, $HELP), $LABELS_NAMES)
     }};
 }
 

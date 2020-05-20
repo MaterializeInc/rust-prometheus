@@ -4,7 +4,7 @@
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use crate::atomic64::{Atomic, AtomicF64, AtomicI64, Number};
+use crate::atomic64::{Atomic, AtomicF64, AtomicI64, AtomicU64, Number};
 use crate::desc::Desc;
 use crate::errors::Result;
 use crate::metrics::{Collector, Metric, Opts};
@@ -25,6 +25,10 @@ pub type Gauge = GenericGauge<AtomicF64>;
 /// The integer version of [`Gauge`]. Provides better performance if metric values are
 /// all integers.
 pub type IntGauge = GenericGauge<AtomicI64>;
+
+/// The unsigned integer version of [`UIntGauge`]. Provides better performance
+/// if metric values are all unsigned integers.
+pub type UIntGauge = GenericGauge<AtomicU64>;
 
 impl<P: Atomic> Clone for GenericGauge<P> {
     fn clone(&self) -> Self {
@@ -146,6 +150,10 @@ pub type GaugeVec = GenericGaugeVec<AtomicF64>;
 /// The integer version of [`GaugeVec`]. Provides better performance if metric values
 /// are all integers.
 pub type IntGaugeVec = GenericGaugeVec<AtomicI64>;
+
+/// The unsigned integer version of [`GaugeVec`]. Provides better performance if
+/// metric values are all unsigned integers.
+pub type UIntGaugeVec = GenericGaugeVec<AtomicU64>;
 
 impl<P: Atomic> GenericGaugeVec<P> {
     /// Create a new [`GenericGaugeVec`] based on the provided

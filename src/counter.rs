@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use crate::atomic64::{Atomic, AtomicF64, AtomicI64, Number};
+use crate::atomic64::{Atomic, AtomicF64, AtomicI64, AtomicU64, Number};
 use crate::desc::Desc;
 use crate::errors::Result;
 use crate::metrics::{Collector, LocalMetric, Metric, Opts};
@@ -26,6 +26,10 @@ pub type Counter = GenericCounter<AtomicF64>;
 /// The integer version of [`Counter`]. Provides better performance if metric values
 /// are all integers.
 pub type IntCounter = GenericCounter<AtomicI64>;
+
+/// The unsigned integer version of [`UIntCounter`]. Provides better performance
+/// if metric values are all unsigned integers.
+pub type UIntCounter = GenericCounter<AtomicU64>;
 
 impl<P: Atomic> Clone for GenericCounter<P> {
     fn clone(&self) -> Self {
@@ -143,6 +147,10 @@ pub type CounterVec = GenericCounterVec<AtomicF64>;
 /// The integer version of [`CounterVec`]. Provides better performance if metric
 /// values are all integers.
 pub type IntCounterVec = GenericCounterVec<AtomicI64>;
+
+/// The unsigned integer version of [`CounterVec`]. Provides better performance
+/// if metric values are all integers.
+pub type UIntCounterVec = GenericCounterVec<AtomicU64>;
 
 impl<P: Atomic> GenericCounterVec<P> {
     /// Create a new [`GenericCounterVec`] based on the provided
