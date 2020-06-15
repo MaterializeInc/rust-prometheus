@@ -4,6 +4,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::marker::PhantomData;
+use std::ops::Deref;
 use std::sync::Arc;
 
 use crate::atomic64::{Atomic, AtomicF64, AtomicI64, AtomicU64, Number};
@@ -314,6 +315,102 @@ impl<P: Atomic> LocalMetric for GenericLocalCounterVec<P> {
 impl<P: Atomic> Clone for GenericLocalCounterVec<P> {
     fn clone(&self) -> Self {
         Self::new(self.vec.clone())
+    }
+}
+
+/// A [`GenericCounter`] wrapper that deletes its labels from the vec when it is dropped
+///
+/// Passing a `GenericCounter` to this with the [`GenericCounterVec`] that it was
+/// created will cause the labels associated with the gauge to be deleted when
+/// it is dropped. This is mostly useful for environments where the [`Counter`]
+/// is created and persists as long as the item that it is providing metrics for.
+///
+/// # Example
+///
+/// ```
+/// use prometheus::{Counter, CounterVec, DeleteOnDropCounter, Opts, core::AtomicF64};
+///
+/// struct UserTracker<'a> {
+///     user: String,
+///     metric: DeleteOnDropCounter<'a, AtomicF64>,
+/// }
+///
+/// fn do_stuff_with(u: &UserTracker) {}
+///
+/// fn main() {
+///     let vec = CounterVec::new(
+///         Opts::new("user_actions", "example help"),
+///         &["user"],
+///     ).unwrap();
+///     {
+///         let user = UserTracker {
+///             user: "Name".into(),
+///             metric: DeleteOnDropCounter::new(vec.with_label_values(&["Name"]), &vec),
+///         };
+///         do_stuff_with(&user);
+///     } // labels are dropped here
+/// }
+/// ```
+#[derive(Debug)]
+pub struct DeleteOnDropCounter<
+    'a,
+    P: Atomic,
+    F: FnOnce(crate::Error, &GenericCounter<P>) = fn(crate::Error, &GenericCounter<P>),
+> {
+    inner: GenericCounter<P>,
+    vec: &'a GenericCounterVec<P>,
+    error_handler: Option<F>,
+}
+
+impl<'a, P: Atomic> DeleteOnDropCounter<'a, P, fn(crate::Error, &GenericCounter<P>)> {
+    /// Create a `DeleteOnDropCounter`
+    pub fn new(
+        gauge: GenericCounter<P>,
+        vec: &'a GenericCounterVec<P>,
+    ) -> DeleteOnDropCounter<'a, P, fn(crate::Error, &GenericCounter<P>)> {
+        DeleteOnDropCounter {
+            inner: gauge,
+            vec,
+            error_handler: None,
+        }
+    }
+}
+
+impl<'a, P: Atomic, F: FnOnce(crate::Error, &GenericCounter<P>)> DeleteOnDropCounter<'a, P, F> {
+    /// Create a `DeleteOnDropCounter`
+    ///
+    /// The `error_handler` will be called on drop if something goes awry
+    pub fn new_with_error_handler(
+        gauge: GenericCounter<P>,
+        vec: &'a GenericCounterVec<P>,
+        error_handler: F,
+    ) -> DeleteOnDropCounter<'a, P, F> {
+        DeleteOnDropCounter {
+            inner: gauge,
+            vec,
+            error_handler: Some(error_handler),
+        }
+    }
+}
+
+impl<'a, P: Atomic, F: FnOnce(crate::Error, &GenericCounter<P>)> Deref
+    for DeleteOnDropCounter<'a, P, F>
+{
+    type Target = GenericCounter<P>;
+    fn deref(&self) -> &GenericCounter<P> {
+        &self.inner
+    }
+}
+
+impl<'a, P: Atomic, F: FnOnce(crate::Error, &GenericCounter<P>)> Drop
+    for DeleteOnDropCounter<'a, P, F>
+{
+    fn drop(&mut self) {
+        if let Err(e) = self.vec.v.delete_label_pairs(&self.inner.v.label_pairs) {
+            if let Some(eh) = self.error_handler.take() {
+                eh(e, &self.inner);
+            }
+        }
     }
 }
 

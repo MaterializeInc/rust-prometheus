@@ -181,7 +181,8 @@ pub mod core {
 }
 
 pub use self::counter::{
-    Counter, CounterVec, IntCounter, IntCounterVec, UIntCounter, UIntCounterVec,
+    Counter, CounterVec, DeleteOnDropCounter, IntCounter, IntCounterVec, UIntCounter,
+    UIntCounterVec,
 };
 pub use self::encoder::Encoder;
 #[cfg(feature = "protobuf")]
@@ -190,7 +191,9 @@ pub use self::encoder::TextEncoder;
 #[cfg(feature = "protobuf")]
 pub use self::encoder::{PROTOBUF_FORMAT, TEXT_FORMAT};
 pub use self::errors::{Error, Result};
-pub use self::gauge::{Gauge, GaugeVec, IntGauge, IntGaugeVec, UIntGauge, UIntGaugeVec};
+pub use self::gauge::{
+    DeleteOnDropGauge, Gauge, GaugeVec, IntGauge, IntGaugeVec, UIntGauge, UIntGaugeVec,
+};
 pub use self::histogram::DEFAULT_BUCKETS;
 pub use self::histogram::{exponential_buckets, linear_buckets};
 pub use self::histogram::{Histogram, HistogramOpts, HistogramTimer, HistogramVec};
