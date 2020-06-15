@@ -56,6 +56,14 @@ impl<P: Atomic> GenericGauge<P> {
         Ok(Self { v: Arc::new(v) })
     }
 
+    /// The fully qualified name for this gauge
+    ///
+    /// This is the name with no labels, and corresponds to `desc().fq_name` on
+    /// the [`Collector`] trait.
+    pub fn fq_name(&self) -> &str {
+        &self.v.desc.fq_name
+    }
+
     /// Set the gauge to an arbitrary value.
     #[inline]
     pub fn set(&self, v: P::T) {

@@ -57,6 +57,14 @@ impl<P: Atomic> GenericCounter<P> {
         Ok(Self { v: Arc::new(v) })
     }
 
+    /// The fully qualified name for this counter
+    ///
+    /// This is the name with no labels, and corresponds to `desc().fq_name` on
+    /// the [`Collector`] trait.
+    pub fn fq_name(&self) -> &str {
+        &self.v.desc.fq_name
+    }
+
     /// Increase the given value to the counter.
     ///
     /// # Panics
