@@ -11,7 +11,7 @@ use spin::RwLock;
 use crate::desc::{Desc, Describer};
 use crate::errors::{Error, Result};
 use crate::metrics::{Collector, Metric};
-use crate::proto::{MetricFamily, MetricType};
+use crate::proto::{LabelPair, MetricFamily, MetricType};
 
 /// An interface for building a metric vector.
 pub trait MetricVecBuilder: Send + Sync + Clone {
@@ -81,6 +81,21 @@ impl<T: MetricVecBuilder> MetricVecCore<T> {
         Ok(())
     }
 
+    /// Delete items from this vec that match the `LabelPair` slice
+    ///
+    /// The label pairs do not need to be in order, but note that they're
+    /// guaranteed to be traversed N * N/2 times, so use [`delete`]
+    /// or[`delete_label_values`] if have lots of labels for some reason.
+    pub fn delete_label_pairs(&self, labels: &[LabelPair]) -> Result<()> {
+        let h = self.hash_label_pair_values(labels)?;
+        let mut children = self.children.write();
+        if children.remove(&h).is_none() {
+            return Err(Error::Msg(format!("missing label pairs {:?}", labels)));
+        }
+
+        Ok(())
+    }
+
     pub fn delete(&self, labels: &HashMap<&str, &str>) -> Result<()> {
         let h = self.hash_labels(labels)?;
 
@@ -134,6 +149,34 @@ impl<T: MetricVecBuilder> MetricVecCore<T> {
             }
         }
 
+        Ok(h.finish())
+    }
+
+    fn hash_label_pair_values(&self, labels: &[LabelPair]) -> Result<u64> {
+        if labels.len() != self.desc.variable_labels.len() {
+            return Err(Error::InconsistentCardinality {
+                expect: self.desc.variable_labels.len(),
+                got: labels.len(),
+            });
+        }
+
+        let mut h = FnvHasher::default();
+        for name in &self.desc.variable_labels {
+            match labels.iter().find(|l| l.get_name() == name) {
+                Some(pair) => h.write(pair.get_value().as_bytes()),
+                None => {
+                    return Err(Error::Msg(format!(
+                        "labels don't match. In vec: {:?} Delete requested: {:?}",
+                        self.desc.variable_labels.join(","),
+                        labels
+                            .iter()
+                            .map(|lp| format!("{}={}", lp.get_name(), lp.get_value()))
+                            .collect::<Vec<_>>()
+                            .join(","),
+                    )))
+                }
+            }
+        }
         Ok(h.finish())
     }
 
