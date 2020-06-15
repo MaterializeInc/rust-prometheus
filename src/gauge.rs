@@ -2,6 +2,7 @@
 // Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.
 
 use std::marker::PhantomData;
+use std::ops::Deref;
 use std::sync::Arc;
 
 use crate::atomic64::{Atomic, AtomicF64, AtomicI64, AtomicU64, Number};
@@ -53,6 +54,14 @@ impl<P: Atomic> GenericGauge<P> {
     fn with_opts_and_label_values(opts: &Opts, label_values: &[&str]) -> Result<Self> {
         let v = Value::new(opts, ValueType::Gauge, P::T::from_i64(0), label_values)?;
         Ok(Self { v: Arc::new(v) })
+    }
+
+    /// The fully qualified name for this gauge
+    ///
+    /// This is the name with no labels, and corresponds to `desc().fq_name` on
+    /// the [`Collector`] trait.
+    pub fn fq_name(&self) -> &str {
+        &self.v.desc.fq_name
     }
 
     /// Set the gauge to an arbitrary value.
@@ -165,6 +174,103 @@ impl<P: Atomic> GenericGaugeVec<P> {
         let metric_vec = MetricVec::create(proto::MetricType::GAUGE, GaugeVecBuilder::new(), opts)?;
 
         Ok(metric_vec as Self)
+    }
+}
+
+/// A [`GenericGauge`] wrapper that deletes its labels from the vec when it is dropped
+///
+/// Passing a `GenericGauge` to this with the `GenericGaugeVec` that it was
+/// created will cause the labels associated with the gauge to be deleted when
+/// it is dropped. This is mostly useful for environments where the [`Gauge`]
+/// is created and persists as long as the item that it is providing metrics for.
+///
+/// # Example
+///
+/// ```
+/// use prometheus::{Gauge, GaugeVec, DeleteOnDropGauge, Opts, core::AtomicF64};
+///
+/// struct UserTracker<'a> {
+///     user: String,
+///     metric: DeleteOnDropGauge<'a, AtomicF64>,
+/// }
+///
+/// fn do_stuff_with(u: &UserTracker) {}
+///
+/// fn main() {
+///     let vec = GaugeVec::new(
+///         Opts::new("user_actions", "example help"),
+///         &["user"],
+///     ).unwrap();
+///     {
+///         let user = UserTracker {
+///             user: "Name".into(),
+///             metric: DeleteOnDropGauge::new(vec.with_label_values(&["Name"]), &vec),
+///         };
+///         do_stuff_with(&user);
+///     } // labels are dropped here
+/// }
+/// ```
+#[derive(Debug)]
+pub struct DeleteOnDropGauge<
+    'a,
+    P: Atomic,
+    F: FnOnce(crate::Error, &GenericGauge<P>) = fn(crate::Error, &GenericGauge<P>),
+> {
+    inner: GenericGauge<P>,
+    vec: &'a GenericGaugeVec<P>,
+    error_handler: Option<F>,
+}
+
+impl<'a, P: Atomic> DeleteOnDropGauge<'a, P, fn(crate::Error, &GenericGauge<P>)> {
+    /// Create a `DeleteOnDropGauge`
+    pub fn new(
+        gauge: GenericGauge<P>,
+        vec: &'a GenericGaugeVec<P>,
+    ) -> DeleteOnDropGauge<'a, P, fn(crate::Error, &GenericGauge<P>)> {
+        DeleteOnDropGauge {
+            inner: gauge,
+            vec,
+            error_handler: None,
+        }
+    }
+}
+
+impl<'a, P: Atomic, F: FnOnce(crate::Error, &GenericGauge<P>)> DeleteOnDropGauge<'a, P, F> {
+    /// Create a `DeleteOnDropGauge`
+    ///
+    /// The `error_handler` will be called on drop if the labels are not known
+    /// to the `GaugeVec` at the time of drop.
+    pub fn new_with_error_handler(
+        gauge: GenericGauge<P>,
+        vec: &'a GenericGaugeVec<P>,
+        error_handler: F,
+    ) -> DeleteOnDropGauge<'a, P, F> {
+        DeleteOnDropGauge {
+            inner: gauge,
+            vec,
+            error_handler: Some(error_handler),
+        }
+    }
+}
+
+impl<'a, P: Atomic, F: FnOnce(crate::Error, &GenericGauge<P>)> Deref
+    for DeleteOnDropGauge<'a, P, F>
+{
+    type Target = GenericGauge<P>;
+    fn deref(&self) -> &GenericGauge<P> {
+        &self.inner
+    }
+}
+
+impl<'a, P: Atomic, F: FnOnce(crate::Error, &GenericGauge<P>)> Drop
+    for DeleteOnDropGauge<'a, P, F>
+{
+    fn drop(&mut self) {
+        if let Err(e) = self.vec.v.delete_label_pairs(&self.inner.v.label_pairs) {
+            if let Some(eh) = self.error_handler.take() {
+                eh(e, &self.inner);
+            }
+        }
     }
 }
 
