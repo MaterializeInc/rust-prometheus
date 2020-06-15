@@ -7,6 +7,8 @@ use std::collections::HashMap;
 use crate::desc::{Desc, Describer};
 use crate::errors::Result;
 use crate::proto::{self, LabelPair};
+use crate::timer;
+use std::cell::Cell;
 
 pub const SEPARATOR_BYTE: u8 = 0xFF;
 
@@ -29,6 +31,25 @@ pub trait Metric: Sync + Send + Clone {
 pub trait LocalMetric {
     /// Flush the local metrics to the global one.
     fn flush(&self);
+}
+
+/// An interface models a LocalMetric with try to flush functions.
+/// Not intend to be implemented by user manually, used in macro generated code.
+pub trait MayFlush: LocalMetric {
+    /// If the LocalMetric is already flushed in last `flush_interval_sec` seconds, then do nothing,
+    /// else flush and update last flush time.
+    fn try_flush(&self, last_flush: &Cell<u64>, flush_interval_millis: u64) {
+        let now = timer::recent_millis();
+        let last_tick = last_flush.get();
+        if now < last_tick + flush_interval_millis {
+            return;
+        }
+        self.flush();
+        last_flush.set(now);
+    }
+
+    /// Open to implementation to fill try_flush parameters
+    fn may_flush(&self);
 }
 
 /// A struct that bundles the options for creating most [`Metric`] types.
@@ -90,7 +111,7 @@ pub struct Opts {
 
 impl Opts {
     /// `new` creates the Opts with the `name` and `help` arguments.
-    pub fn new<S: Into<String>>(name: S, help: S) -> Opts {
+    pub fn new<S1: Into<String>, S2: Into<String>>(name: S1, help: S2) -> Opts {
         Opts {
             namespace: "".to_owned(),
             subsystem: "".to_owned(),
@@ -120,7 +141,7 @@ impl Opts {
     }
 
     /// `const_label` adds a const label.
-    pub fn const_label<S: Into<String>>(mut self, name: S, value: S) -> Self {
+    pub fn const_label<S1: Into<String>, S2: Into<String>>(mut self, name: S1, value: S2) -> Self {
         self.const_labels.insert(name.into(), value.into());
         self
     }
@@ -236,5 +257,10 @@ mod tests {
         for (namespace, subsystem, name, res) in tbl {
             assert_eq!(&build_fq_name(namespace, subsystem, name), res);
         }
+    }
+
+    #[test]
+    fn test_different_generic_types() {
+        Opts::new(format!("{}_{}", "string", "label"), "&str_label");
     }
 }

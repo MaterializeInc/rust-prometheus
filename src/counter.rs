@@ -42,7 +42,7 @@ impl<P: Atomic> Clone for GenericCounter<P> {
 
 impl<P: Atomic> GenericCounter<P> {
     /// Create a [`GenericCounter`] with the `name` and `help` arguments.
-    pub fn new<S: Into<String>>(name: S, help: S) -> Result<Self> {
+    pub fn new<S1: Into<String>, S2: Into<String>>(name: S1, help: S2) -> Result<Self> {
         let opts = Opts::new(name, help);
         Self::with_opts(opts)
     }
@@ -189,6 +189,18 @@ pub struct GenericLocalCounter<P: Atomic> {
 }
 
 /// An unsync [`Counter`].
+///
+/// For auto_flush::AFLocalCounter to use to make type inference possible
+pub trait CounterWithValueType {
+    ///the exact type which implements Atomic
+    type ValueType: Atomic;
+}
+
+impl<P: Atomic> CounterWithValueType for GenericLocalCounter<P> {
+    type ValueType = P;
+}
+
+/// An unsync [`Counter`].
 pub type LocalCounter = GenericLocalCounter<AtomicF64>;
 
 /// The integer version of [`LocalCounter`]. Provides better performance
@@ -244,7 +256,7 @@ impl<P: Atomic> GenericLocalCounter<P> {
 }
 
 impl<P: Atomic> LocalMetric for GenericLocalCounter<P> {
-    /// Flush the local metrics to the [`Counter`](::Counter).
+    /// Flush the local metrics to the [`Counter`].
     #[inline]
     fn flush(&self) {
         GenericLocalCounter::flush(self);
@@ -314,7 +326,7 @@ impl<P: Atomic> GenericLocalCounterVec<P> {
 }
 
 impl<P: Atomic> LocalMetric for GenericLocalCounterVec<P> {
-    /// Flush the local metrics to the [`CounterVec`](::CounterVec) metric.
+    /// Flush the local metrics to the [`CounterVec`] metric.
     fn flush(&self) {
         GenericLocalCounterVec::flush(self);
     }

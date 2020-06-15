@@ -84,7 +84,7 @@ pub struct HistogramOpts {
 
 impl HistogramOpts {
     /// Create a [`HistogramOpts`] with the `name` and `help` arguments.
-    pub fn new<S: Into<String>>(name: S, help: S) -> HistogramOpts {
+    pub fn new<S1: Into<String>, S2: Into<String>>(name: S1, help: S2) -> HistogramOpts {
         HistogramOpts {
             common_opts: Opts::new(name, help),
             buckets: Vec::from(DEFAULT_BUCKETS as &'static [f64]),
@@ -111,7 +111,7 @@ impl HistogramOpts {
     }
 
     /// `const_label` adds a const label.
-    pub fn const_label<S: Into<String>>(mut self, name: S, value: S) -> Self {
+    pub fn const_label<S1: Into<String>, S2: Into<String>>(mut self, name: S1, value: S2) -> Self {
         self.common_opts = self.common_opts.const_label(name, value);
         self
     }
@@ -188,7 +188,8 @@ impl HistogramCore {
         for pair in &desc.const_label_pairs {
             check_bucket_label(pair.get_name())?;
         }
-        let pairs = make_label_pairs(&desc, label_values);
+
+        let label_pairs = make_label_pairs(&desc, label_values)?;
 
         let buckets = check_and_adjust_buckets(opts.buckets.clone())?;
 
@@ -199,7 +200,7 @@ impl HistogramCore {
 
         Ok(HistogramCore {
             desc,
-            label_pairs: pairs,
+            label_pairs,
             sum: AtomicF64::new(0.0),
             count: AtomicU64::new(0),
             upper_bounds: buckets,
@@ -268,28 +269,28 @@ impl std::fmt::Debug for Timespec {
 }
 
 #[derive(Debug)]
-enum Instant {
+pub enum Instant {
     Monotonic(StdInstant),
     #[cfg(all(feature = "nightly", target_os = "linux"))]
     MonotonicCoarse(Timespec),
 }
 
 impl Instant {
-    fn now() -> Instant {
+    pub fn now() -> Instant {
         Instant::Monotonic(StdInstant::now())
     }
 
     #[cfg(all(feature = "nightly", target_os = "linux"))]
-    fn now_coarse() -> Instant {
+    pub fn now_coarse() -> Instant {
         Instant::MonotonicCoarse(get_time_coarse())
     }
 
     #[cfg(all(feature = "nightly", not(target_os = "linux")))]
-    fn now_coarse() -> Instant {
+    pub fn now_coarse() -> Instant {
         Instant::Monotonic(StdInstant::now())
     }
 
-    fn elapsed(&self) -> Duration {
+    pub fn elapsed(&self) -> Duration {
         match &*self {
             Instant::Monotonic(i) => i.elapsed(),
 
@@ -311,6 +312,11 @@ impl Instant {
                 }
             }
         }
+    }
+
+    #[inline]
+    pub fn elapsed_sec(&self) -> f64 {
+        duration_to_seconds(self.elapsed())
     }
 }
 
@@ -404,7 +410,7 @@ impl HistogramTimer {
     }
 
     fn observe(&mut self, record: bool) -> f64 {
-        let v = duration_to_seconds(self.start.elapsed());
+        let v = self.start.elapsed_sec();
         self.observed = true;
         if record {
             self.histogram.observe(v);
@@ -486,7 +492,7 @@ impl Histogram {
     {
         let instant = Instant::now();
         let res = f();
-        let elapsed = duration_to_seconds(instant.elapsed());
+        let elapsed = instant.elapsed_sec();
         self.observe(elapsed);
         res
     }
@@ -499,7 +505,7 @@ impl Histogram {
     {
         let instant = Instant::now_coarse();
         let res = f();
-        let elapsed = duration_to_seconds(instant.elapsed());
+        let elapsed = instant.elapsed_sec();
         self.observe(elapsed);
         res
     }
@@ -656,7 +662,7 @@ pub fn exponential_buckets(start: f64, factor: f64, count: usize) -> Result<Vec<
 
 /// `duration_to_seconds` converts Duration to seconds.
 #[inline]
-fn duration_to_seconds(d: Duration) -> f64 {
+pub fn duration_to_seconds(d: Duration) -> f64 {
     let nanos = f64::from(d.subsec_nanos()) / 1e9;
     d.as_secs() as f64 + nanos
 }
@@ -741,7 +747,7 @@ impl LocalHistogramTimer {
     }
 
     fn observe(&mut self, record: bool) -> f64 {
-        let v = duration_to_seconds(self.start.elapsed());
+        let v = self.start.elapsed_sec();
         self.observed = true;
         if record {
             self.local.observe(v);
@@ -859,7 +865,7 @@ impl LocalHistogram {
     {
         let instant = Instant::now();
         let res = f();
-        let elapsed = duration_to_seconds(instant.elapsed());
+        let elapsed = instant.elapsed_sec();
         self.observe(elapsed);
         res
     }
@@ -872,7 +878,7 @@ impl LocalHistogram {
     {
         let instant = Instant::now_coarse();
         let res = f();
-        let elapsed = duration_to_seconds(instant.elapsed());
+        let elapsed = instant.elapsed_sec();
         self.observe(elapsed);
         res
     }
@@ -899,7 +905,7 @@ impl LocalHistogram {
 }
 
 impl LocalMetric for LocalHistogram {
-    /// Flush the local metrics to the [`Histogram`](::Histogram) metric.
+    /// Flush the local metrics to the [`Histogram`] metric.
     fn flush(&self) {
         LocalHistogram::flush(self);
     }
@@ -951,7 +957,7 @@ impl LocalHistogramVec {
 }
 
 impl LocalMetric for LocalHistogramVec {
-    /// Flush the local metrics to the [`HistogramVec`](::HistogramVec) metric.
+    /// Flush the local metrics to the [`HistogramVec`] metric.
     fn flush(&self) {
         LocalHistogramVec::flush(self)
     }
@@ -1239,6 +1245,25 @@ mod tests {
             local_vec.with_label_values(&["v1", "v2"]).observe(2.0);
             drop(local_vec);
             check(1, 2.0);
+        }
+    }
+
+    #[test]
+    fn test_error_on_inconsistent_label_cardinality() {
+        let hist = Histogram::with_opts(
+            histogram_opts!(
+                "example_histogram",
+                "Used as an example",
+                vec![0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 5.0]
+            )
+            .variable_label("example_variable"),
+        );
+
+        if let Err(Error::InconsistentCardinality { expect, got }) = hist {
+            assert_eq!(1, expect);
+            assert_eq!(0, got);
+        } else {
+            panic!("Expected InconsistentCardinality error.")
         }
     }
 }
