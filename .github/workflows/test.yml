@@ -1,0 +1,39 @@
+name: Test
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    env:
+      RUST_BACKTRACE: 1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: rustfmt
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: cargo fmt -- --color=always --check
+      - name: Run tests
+        run: cargo test --color=always -- --color=always
+      - name: Run tests no-features
+        run: cargo test --no-default-features --color=always -- --color=always
+      - name: Run tests process
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: cargo test --features process --color=always -- --color=always
