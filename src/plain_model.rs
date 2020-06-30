@@ -183,7 +183,6 @@ pub struct Histogram {
     sample_count: u64,
     sample_sum: f64,
     bucket: Vec<Bucket>,
-    expose_decumulated: bool,
 }
 
 impl Histogram {
@@ -214,14 +213,6 @@ impl Histogram {
 
     pub fn get_bucket(&self) -> &[Bucket] {
         &self.bucket
-    }
-
-    pub fn set_expose_decumulated(&mut self, v: bool) {
-        self.expose_decumulated = v;
-    }
-
-    pub fn get_expose_decumulated(&self) -> bool {
-        self.expose_decumulated
     }
 }
 

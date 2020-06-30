@@ -56,7 +56,6 @@ message Histogram {
   optional uint64 sample_count = 1;
   optional double sample_sum   = 2;
   repeated Bucket bucket       = 3; // Ordered in increasing order of upper_bound, +Inf bucket is optional.
-  optional bool   expose_decumulated = 4;
 }
 
 message Bucket {

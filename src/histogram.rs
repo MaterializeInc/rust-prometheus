@@ -77,9 +77,6 @@ pub struct HistogramOpts {
     /// to add a highest bucket with +Inf bound, it will be added
     /// implicitly. The default value is DefBuckets.
     pub buckets: Vec<f64>,
-
-    /// Include unbucketed, unsummed values in a separate metric
-    pub expose_decumulated: bool,
 }
 
 impl HistogramOpts {
@@ -88,7 +85,6 @@ impl HistogramOpts {
         HistogramOpts {
             common_opts: Opts::new(name, help),
             buckets: Vec::from(DEFAULT_BUCKETS as &'static [f64]),
-            expose_decumulated: false,
         }
     }
 
@@ -138,15 +134,6 @@ impl HistogramOpts {
         self.buckets = buckets;
         self
     }
-
-    /// Set the options to include unaggregated
-    ///
-    /// This cannot be used by the prometheus server's `histogram_quantile`
-    /// function, but is useful for generating heatmaps in other frontends
-    pub fn expose_decumulated(mut self) -> Self {
-        self.expose_decumulated = true;
-        self
-    }
 }
 
 impl Describer for HistogramOpts {
@@ -160,7 +147,6 @@ impl From<Opts> for HistogramOpts {
         HistogramOpts {
             common_opts: opts,
             buckets: Vec::from(DEFAULT_BUCKETS as &'static [f64]),
-            expose_decumulated: false,
         }
     }
 }
@@ -175,7 +161,6 @@ pub struct HistogramCore {
 
     upper_bounds: Vec<f64>,
     counts: Vec<AtomicU64>,
-    expose_decumulated: bool,
 }
 
 impl HistogramCore {
@@ -205,7 +190,6 @@ impl HistogramCore {
             count: AtomicU64::new(0),
             upper_bounds: buckets,
             counts,
-            expose_decumulated: opts.expose_decumulated,
         })
     }
 
@@ -228,7 +212,6 @@ impl HistogramCore {
         let mut h = proto::Histogram::default();
         h.set_sample_sum(self.sum.get());
         h.set_sample_count(self.count.get() as u64);
-        h.set_expose_decumulated(self.expose_decumulated);
 
         let mut count = 0;
         let mut buckets = Vec::with_capacity(self.upper_bounds.len());
@@ -343,10 +326,6 @@ mod coarse {
         );
         t
     }
-}
-
-pub trait TimerObservable {
-    fn stop_and_record(&mut self) -> f64;
 }
 
 /// Timer to measure and record the duration of an event.
