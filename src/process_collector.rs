@@ -4,11 +4,12 @@
 //!
 //! This module only supports **Linux** platform.
 
+use std::collections::HashMap;
 use std::sync::Mutex;
 
-use crate::counter::Counter;
+use crate::counter::{Counter, CounterVec};
 use crate::desc::Desc;
-use crate::gauge::Gauge;
+use crate::gauge::{Gauge, GaugeVec};
 use crate::metrics::{Collector, Opts};
 use crate::proto;
 
@@ -16,7 +17,7 @@ use crate::proto;
 pub use libc::pid_t;
 
 // Six metrics per ProcessCollector.
-const MERTICS_NUMBER: usize = 7;
+const MERTICS_NUMBER: usize = 9;
 
 /// A collector which exports the current state of
 /// process metrics including cpu, memory and file descriptor usage as well as
@@ -31,6 +32,7 @@ pub struct ProcessCollector {
     vsize: Gauge,
     rss: Gauge,
     swap: Gauge,
+    threads: ThreadsCollector,
     start_time: Gauge,
 }
 
@@ -109,6 +111,9 @@ impl ProcessCollector {
         .unwrap();
         descs.extend(start_time.desc().into_iter().cloned());
 
+        let threads = ThreadsCollector::new(pid);
+        descs.extend(threads.desc().into_iter().cloned());
+
         ProcessCollector {
             pid,
             descs,
@@ -118,6 +123,7 @@ impl ProcessCollector {
             vsize,
             rss,
             swap,
+            threads,
             start_time,
         }
     }
@@ -171,13 +177,10 @@ impl Collector for ProcessCollector {
         // cpu
         let cpu_total_mfs = {
             let cpu_total = self.cpu_total.lock().unwrap();
-            let total = (p.stat.utime + p.stat.stime) as f64 / *CLK_TCK;
-            let past = cpu_total.get();
-            let delta = total - past;
+            let delta = collect_cpu_stat(&cpu_total, &p.stat);
             if delta > 0.0 {
                 cpu_total.inc_by(delta);
             }
-
             cpu_total.collect()
         };
 
@@ -190,8 +193,154 @@ impl Collector for ProcessCollector {
         mfs.extend(self.rss.collect());
         mfs.extend(self.swap.collect());
         mfs.extend(self.start_time.collect());
+        mfs.extend(self.threads.collect());
         mfs
     }
+}
+
+#[derive(Debug)]
+struct ThreadsCollector {
+    inner: Mutex<TcInner>,
+
+    descs: Vec<Desc>,
+}
+
+#[derive(Debug)]
+struct TcInner {
+    known_threads: HashMap<String, ThreadStats>,
+    pid: pid_t,
+
+    total_cpu_vec: CounterVec,
+    thread_count_vec: GaugeVec,
+}
+
+impl ThreadsCollector {
+    fn new(pid: pid_t) -> ThreadsCollector {
+        let known_threads = HashMap::new();
+        let total_cpu_vec = CounterVec::new(
+            Opts::new(
+                "process_thread_cpu_seconds_total",
+                "The total time spent by all threads with this name.",
+            ),
+            &["thread_name"],
+        )
+        .unwrap();
+        let thread_count_vec = GaugeVec::new(
+            Opts::new("process_thread_count", "Number of threads with this name"),
+            &["thread_name"],
+        )
+        .unwrap();
+
+        let mut descs = Vec::new();
+        descs.extend(thread_count_vec.desc().into_iter().cloned());
+        descs.extend(total_cpu_vec.desc().into_iter().cloned());
+
+        ThreadsCollector {
+            inner: Mutex::new(TcInner {
+                known_threads,
+                pid,
+                total_cpu_vec,
+                thread_count_vec,
+            }),
+            descs,
+        }
+    }
+}
+
+impl Collector for ThreadsCollector {
+    fn desc(&self) -> Vec<&Desc> {
+        self.descs.iter().collect()
+    }
+
+    fn collect(&self) -> Vec<proto::MetricFamily> {
+        let mut tc = self.inner.lock().unwrap();
+        let p = match procfs::process::Process::new(tc.pid) {
+            Ok(p) => p,
+            Err(..) => {
+                // we can't construct a Process object, so there's no stats to gather
+                return Vec::new();
+            }
+        };
+
+        if let Ok(threads) = p.tasks() {
+            // Thread errors can happen when the thread is completed while we're inspecting
+            for thread in threads.flat_map(|t_result| t_result) {
+                let name = match thread.stat() {
+                    Ok(stat) => stat.comm,
+                    Err(_) => continue,
+                };
+                let stats = match tc.known_threads.get_mut(&name) {
+                    Some(thread) => thread,
+                    None => {
+                        let total_cpu = tc.total_cpu_vec.with_label_values(&[&name]);
+                        let thread_count = tc.thread_count_vec.with_label_values(&[&name]);
+                        tc.known_threads
+                            // use entry instead of insert to get a reference to
+                            // the newly inserted stats
+                            .entry(name.clone())
+                            .or_insert(ThreadStats::new(total_cpu, thread_count))
+                    }
+                };
+                stats.update(&thread);
+            }
+        }
+
+        let mut mfs = Vec::new();
+        for (_, ts) in tc.known_threads.iter_mut() {
+            ts.finish(&mut mfs);
+        }
+        mfs
+    }
+}
+
+#[derive(Debug)]
+struct ThreadStats {
+    total_cpu: Counter,
+    count: Gauge,
+    local_total: u64,
+    local_count: f64,
+}
+
+impl ThreadStats {
+    fn new(total_cpu: Counter, count: Gauge) -> ThreadStats {
+        ThreadStats {
+            total_cpu,
+            count,
+            local_total: 0,
+            local_count: 0.0,
+        }
+    }
+
+    fn update(&mut self, thread: &procfs::process::Task) {
+        self.local_count += 1.0;
+        if let Ok(stat) = thread.stat() {
+            self.local_total += stat.utime + stat.stime;
+        }
+    }
+
+    /// Extend metric families with data for threads that were found on this last iteration
+    fn finish(&mut self, metric_families: &mut Vec<proto::MetricFamily>) {
+        if self.local_count != 0.0 {
+            self.count.set(self.local_count);
+            let past = self.total_cpu.get();
+            let total = self.local_total as f64 / *CLK_TCK;
+            let delta = total - past;
+            if delta > 0.0 {
+                self.total_cpu.inc_by(delta);
+            }
+            self.local_count = 0.0;
+            self.local_total = 0;
+
+            metric_families.extend(self.count.collect());
+            metric_families.extend(self.total_cpu.collect());
+        }
+    }
+}
+
+fn collect_cpu_stat(cpu_total: &Counter, stat: &procfs::process::Stat) -> f64 {
+    let total = (stat.utime + stat.stime) as f64 / *CLK_TCK;
+    let past = cpu_total.get();
+    total - past
 }
 
 lazy_static! {
@@ -224,8 +373,11 @@ mod tests {
     fn test_process_collector() {
         let pc = ProcessCollector::for_self();
         {
-            // Six metrics per process collector.
+            // Ensure that we have at least the right number of metrics
             let descs = pc.desc();
+            for desc in &descs {
+                println!("{:?}", desc);
+            }
             assert_eq!(
                 descs.len(),
                 super::MERTICS_NUMBER,
@@ -234,10 +386,9 @@ mod tests {
                 super::MERTICS_NUMBER
             );
             let mfs = pc.collect();
-            assert_eq!(
-                mfs.len(),
-                super::MERTICS_NUMBER,
-                "MetricFamilies count ({}) should match actual {}",
+            assert!(
+                mfs.len() >= super::MERTICS_NUMBER,
+                "MetricFamilies count ({}) should be gte actual {}",
                 mfs.len(),
                 super::MERTICS_NUMBER
             );
@@ -246,5 +397,6 @@ mod tests {
         let r = registry::Registry::new();
         let res = r.register(Box::new(pc));
         assert!(res.is_ok());
+        r.gather();
     }
 }
