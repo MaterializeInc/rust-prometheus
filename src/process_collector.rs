@@ -16,8 +16,8 @@ use crate::proto;
 /// The `pid_t` data type represents process IDs.
 pub use libc::pid_t;
 
-// Six metrics per ProcessCollector.
-const MERTICS_NUMBER: usize = 9;
+/// Six metrics per ProcessCollector.
+const METRICS_NUMBER: usize = 6;
 
 /// A collector which exports the current state of
 /// process metrics including cpu, memory and file descriptor usage as well as
@@ -185,7 +185,7 @@ impl Collector for ProcessCollector {
         };
 
         // collect MetricFamilys.
-        let mut mfs = Vec::with_capacity(MERTICS_NUMBER);
+        let mut mfs = Vec::with_capacity(METRICS_NUMBER);
         mfs.extend(cpu_total_mfs);
         mfs.extend(self.open_fds.collect());
         mfs.extend(self.max_fds.collect());
@@ -375,23 +375,9 @@ mod tests {
         {
             // Ensure that we have at least the right number of metrics
             let descs = pc.desc();
-            for desc in &descs {
-                println!("{:?}", desc);
-            }
-            assert_eq!(
-                descs.len(),
-                super::MERTICS_NUMBER,
-                "descs count ({}) should match expected actual ({})",
-                descs.len(),
-                super::MERTICS_NUMBER
-            );
+            assert_eq!(descs.len(), super::METRICS_NUMBER);
             let mfs = pc.collect();
-            assert!(
-                mfs.len() >= super::MERTICS_NUMBER,
-                "MetricFamilies count ({}) should be gte actual {}",
-                mfs.len(),
-                super::MERTICS_NUMBER
-            );
+            assert_eq!(mfs.len(), super::METRICS_NUMBER);
         }
 
         let r = registry::Registry::new();

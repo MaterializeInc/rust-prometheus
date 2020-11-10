@@ -29,12 +29,6 @@ matrix:
     env: FEATURES="nightly protobuf push process"
   - rust: beta
   - rust: stable
-    install:
-      - rustup component add clippy-preview
-      - rustup component add rustfmt-preview
-    before_script:
-      - cargo fmt --all -- --check
-      - cargo clippy --all -- -D clippy
   allow_failures:
   - rust: nightly
 

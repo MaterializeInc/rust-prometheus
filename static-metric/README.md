@@ -36,20 +36,18 @@ introducing a lot of templating code.
 
 ## Getting Started
 
-+ Add to `Cargo.toml`:
+- Add to `Cargo.toml`:
 
-    ```toml
-    [dependencies]
-    prometheus-static-metric = "0.1"
-    ```
+  ```toml
+  [dependencies]
+  prometheus-static-metric = "0.4"
+  ```
 
-+ Add to `lib.rs`:
+- Add to `lib.rs`:
 
-    ```rust
-    #![feature(proc_macro)]
-
-    extern crate prometheus_static_metric;
-    ```
+  ```rust
+  extern crate prometheus_static_metric;
+  ```
 
 ## Example
 
@@ -127,8 +125,8 @@ make_auto_flush_static_metric! {
 lazy_static! {
     pub static ref HTTP_COUNTER_VEC: IntCounterVec =
         register_int_counter_vec ! (
-            "http_requests",
-            "Total number of HTTP requests.",
+            "http_requests_total",
+            "Number of HTTP requests.",
             & ["product", "method", "version"]    // it doesn't matter for the label order
         ).unwrap();
 }
@@ -161,7 +159,5 @@ fn main() {
     );
 }
 ```
-
-
 
 Please take a look at [examples](./examples) directory for more.
