@@ -357,19 +357,17 @@ impl<P: Atomic> Clone for GenericLocalCounterVec<P> {
 ///
 /// fn do_stuff_with(u: &UserTracker) {}
 ///
-/// fn main() {
-///     let vec = CounterVec::new(
-///         Opts::new("user_actions", "example help"),
-///         &["user"],
-///     ).unwrap();
-///     {
-///         let user = UserTracker {
-///             user: "Name".into(),
-///             metric: DeleteOnDropCounter::new(vec.with_label_values(&["Name"]), &vec),
-///         };
-///         do_stuff_with(&user);
-///     } // labels are dropped here
-/// }
+/// let vec = CounterVec::new(
+///     Opts::new("user_actions", "example help"),
+///     &["user"],
+/// ).unwrap();
+/// {
+///     let user = UserTracker {
+///         user: "Name".into(),
+///         metric: DeleteOnDropCounter::new(vec.with_label_values(&["Name"]), &vec),
+///     };
+///     do_stuff_with(&user);
+/// } // labels are dropped here
 /// ```
 #[derive(Debug)]
 pub struct DeleteOnDropCounter<

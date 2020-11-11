@@ -196,19 +196,17 @@ impl<P: Atomic> GenericGaugeVec<P> {
 ///
 /// fn do_stuff_with(u: &UserTracker) {}
 ///
-/// fn main() {
-///     let vec = GaugeVec::new(
-///         Opts::new("user_actions", "example help"),
-///         &["user"],
-///     ).unwrap();
-///     {
-///         let user = UserTracker {
-///             user: "Name".into(),
-///             metric: DeleteOnDropGauge::new(vec.with_label_values(&["Name"]), &vec),
-///         };
-///         do_stuff_with(&user);
-///     } // labels are dropped here
-/// }
+/// let vec = GaugeVec::new(
+///     Opts::new("user_actions", "example help"),
+///     &["user"],
+/// ).unwrap();
+/// {
+///     let user = UserTracker {
+///         user: "Name".into(),
+///         metric: DeleteOnDropGauge::new(vec.with_label_values(&["Name"]), &vec),
+///     };
+///     do_stuff_with(&user);
+/// } // labels are dropped here
 /// ```
 #[derive(Debug)]
 pub struct DeleteOnDropGauge<
