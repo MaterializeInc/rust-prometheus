@@ -17,7 +17,7 @@ use crate::proto;
 pub use libc::pid_t;
 
 /// Six metrics per ProcessCollector.
-const METRICS_NUMBER: usize = 6;
+const METRICS_NUMBER: usize = 9;
 
 /// A collector which exports the current state of
 /// process metrics including cpu, memory and file descriptor usage as well as
@@ -375,9 +375,23 @@ mod tests {
         {
             // Ensure that we have at least the right number of metrics
             let descs = pc.desc();
-            assert_eq!(descs.len(), super::METRICS_NUMBER);
+            for desc in &descs {
+                println!("{:?}", desc);
+            }
+            assert_eq!(
+                descs.len(),
+                super::METRICS_NUMBER,
+                "descs count ({}) should match expected actual ({})",
+                descs.len(),
+                super::METRICS_NUMBER
+            );
             let mfs = pc.collect();
-            assert_eq!(mfs.len(), super::METRICS_NUMBER);
+            assert!(
+                mfs.len() >= super::METRICS_NUMBER,
+                "MetricFamilies count ({}) should be gte actual {}",
+                mfs.len(),
+                super::METRICS_NUMBER
+            );
         }
 
         let r = registry::Registry::new();
