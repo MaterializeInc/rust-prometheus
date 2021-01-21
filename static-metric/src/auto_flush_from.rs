@@ -1,7 +1,6 @@
 // Copyright 2019 TiKV Project Authors. Licensed under Apache-2.0.
 
-use proc_macro2::Span;
-use syn::export::TokenStream2;
+use proc_macro2::{Span, TokenStream};
 use syn::parse::{Parse, ParseStream};
 use syn::token::*;
 use syn::*;
@@ -38,7 +37,7 @@ impl Parse for AutoFlushFromDef {
 }
 
 impl AutoFlushFromDef {
-    pub fn auto_flush_from(&self) -> TokenStream2 {
+    pub fn auto_flush_from(&self) -> TokenStream {
         let inner_class_name = self.inner_class_name.clone();
         let class_name = self.class_name.clone();
         let source_var_name = self.source_var_name.clone();
